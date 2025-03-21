@@ -1,20 +1,17 @@
 generate_diagnosis <-
   function( input.control = NULL, # Sample, features
             input.sample = NULL, # Sample, features
-            reference = NULL, # IEM, features, no other columns
+            reference = NULL, # IMD, features, no other columns
             top.nr = 3,
             calc.z = TRUE){
     
     # Check features in new samples and reference, take all the features in reference
-    f_1 <- colnames(input.sample)[!colnames(input.sample) %in% c("Sample", "IEM")]
-    f_2 <- colnames(reference)[!colnames(reference) %in% c("Sample", "IEM")]
-    # fs <- unique(c(f_1, f_2))
-    # input.sample[, fs[!fs %in% f_1]] <- 0 
-    # reference[, fs[!fs %in% f_2]] <- 0 
+    f_1 <- colnames(input.sample)[!colnames(input.sample) %in% c("Sample", "IMD")]
+    f_2 <- colnames(reference)[!colnames(reference) %in% c("Sample", "IMD")]
     fs <- unique(f_2)
     input.sample[, fs[!fs %in% f_1]] <- 0
     
-    features <- colnames(reference)[!colnames(reference) %in% c("IEM")]
+    features <- colnames(reference)[!colnames(reference) %in% c("IMD")]
     s <- input.sample[, features]
     
     # standardize
@@ -36,9 +33,6 @@ generate_diagnosis <-
              function(x){
                apply( reference[, features], 1,
                       function(y){
-                        #cor(x,y, method = "pearson")
-                        #cor(x,y, method = "spearman")
-                        #(x - mean(x)) %*% (y - mean(y)) / (sqrt(sum((x - mean(x))^2))*sqrt(sum((y - mean(y))^2)))
                         x %*% y / (sqrt(sum(x^2))*sqrt(sum(y^2)))
                         
                       })
@@ -52,7 +46,7 @@ generate_diagnosis <-
           ind <- sort(compare[, x], decreasing = TRUE, index.return = TRUE)$ix[1:top.nr]
           diag <- 
             data.frame( Sample = input.sample[x, "Sample"],
-                        Putative_IEM = reference$IEM[ind],
+                        Putative_IMD = reference$IMD[ind],
                         Score = compare[ind, x],
                         Rank = 1:top.nr)
           
@@ -62,7 +56,7 @@ generate_diagnosis <-
     
     diagnosis.f <-
       diagnosis %>%
-      pivot_wider(names_from = "Rank", values_from = c("Putative_IEM", "Score"), names_sort = TRUE)
+      pivot_wider(names_from = "Rank", values_from = c("Putative_IMD", "Score"), names_sort = TRUE)
     
     return(diagnosis.f)
     

@@ -1,15 +1,15 @@
 variable_selection <-
-  function( input.control = NULL, # Sample, IEM, features
-            input.sample = NULL, # Sample, IEM, features
-            reference = NULL, # IEM, features, no other columns, standardized
+  function( input.control = NULL, # Sample, IMD, features
+            input.sample = NULL, # Sample, IMD, features
+            reference = NULL, # IMD, features, no other columns, standardized
             top.nr = 20,
             start.run = FALSE,
             calc.z = TRUE
   ){
     # Check features in new samples and reference, take union
     if (!is.null(reference)) {
-      f_1 <- colnames(input.control)[!colnames(input.control) %in% c("Sample", "IEM")]
-      f_2 <- colnames(reference)[!colnames(reference) %in% c("Sample", "IEM")]
+      f_1 <- colnames(input.control)[!colnames(input.control) %in% c("Sample", "IMD")]
+      f_2 <- colnames(reference)[!colnames(reference) %in% c("Sample", "IMD")]
       fs <- unique(c(f_1, f_2))
       input.control[, fs[!fs %in% f_1]] <- 0 
       input.sample[, fs[!fs %in% f_1]] <- 0 
@@ -18,19 +18,19 @@ variable_selection <-
     }
     
     if (start.run) {
-      features <- colnames(input.control)[!colnames(input.control) %in% c("Sample", "IEM")]
+      features <- colnames(input.control)[!colnames(input.control) %in% c("Sample", "IMD")]
       
       if (calc.z) {
         mean.c <- apply(input.control[, features], 2, mean)
         sd.c <- apply(input.control[, features], 2, sd)
         
         z.ref <- 
-          cbind(input.sample[, c("Sample", "IEM")], 
+          cbind(input.sample[, c("Sample", "IMD")], 
                 t(apply(input.sample[, features], 1, function(x){ (x - mean.c)/sd.c })))
         
       } else {
         z.ref <- 
-          cbind(input.sample[, c("Sample", "IEM")], 
+          cbind(input.sample[, c("Sample", "IMD")], 
                 input.sample[, features])
         
       }
@@ -40,8 +40,8 @@ variable_selection <-
         select(-Sample)
     }
     
-    features <- colnames(input.control)[!colnames(input.control) %in% c("Sample", "IEM")]
-    iem <- unique(input.sample$IEM)
+    features <- colnames(input.control)[!colnames(input.control) %in% c("Sample", "IMD")]
+    imd <- unique(input.sample$IMD)
     
     # standardize
     c <- as.matrix(input.control[, features])
@@ -58,14 +58,14 @@ variable_selection <-
       z.s <- as.matrix(input.sample[, features])
     }
     
-    z.out <- data.frame( matrix( nrow = length(iem), ncol = length(features)))
-    for (i in 1:length(iem)){
+    z.out <- data.frame( matrix( nrow = length(imd), ncol = length(features)))
+    for (i in 1:length(imd)){
       
-      iem.i <- iem[i]
-      subset <- z.s[ input.sample$IEM %in% iem.i, , drop = FALSE]
-      ref <- reference[ !reference$IEM %in% iem.i, features]
+      imd.i <- imd[i]
+      subset <- z.s[ input.sample$IMD %in% imd.i, , drop = FALSE]
+      ref <- reference[ !reference$IMD %in% imd.i, features]
       
-      # Intersection of selected features within same IEM
+      # Intersection of selected features within same IMD
       if (nrow(subset) > 1){
         
         ws <- 
@@ -102,12 +102,12 @@ variable_selection <-
       
       
       subset.m <- apply(subset, 2, mean)
-      z.iem.i <- sapply(1:nrow(ws), 
+      z.imd.i <- sapply(1:nrow(ws), 
                         function(x){ 
                           ifelse(sum(ws[x,] == 0) == 0, subset.m[x], 0)
                         })
       
-      # Unite of selected features with other IEM
+      # Unite of selected features with other IMD
       ws.ref <- 
         apply(ref, 1, 
               function(x){
@@ -131,60 +131,54 @@ variable_selection <-
       
       if (ncol(ws.ref) > 1){
         
-        z.iem.i.ref <- sapply(1:nrow(ws.ref), 
+        z.imd.i.ref <- sapply(1:nrow(ws.ref), 
                               function(x){ 
-                                ifelse(z.iem.i[x] != 0 | max(ws.ref[x,]) > 0, subset.m[x], 0)
+                                ifelse(z.imd.i[x] != 0 | max(ws.ref[x,]) > 0, subset.m[x], 0)
                               })
         
       } else {
         
-        z.iem.i.ref <- z.iem.i
+        z.imd.i.ref <- z.imd.i
         
       }
       
       # Take the average between new samples and the reference
-      ref.orig <- reference[ reference$IEM %in% iem.i, features]
+      ref.orig <- reference[ reference$IMD %in% imd.i, features]
       if (nrow(ref.orig) > 0 && !start.run){
         
-        newset <- rbind(ref.orig, z.iem.i.ref)
-        z.iem.i.ref.merge <-
-          apply(newset, 2, function(x){ #mean(x)
+        newset <- rbind(ref.orig, z.imd.i.ref)
+        z.imd.i.ref.merge <-
+          apply(newset, 2, function(x){
             ifelse(sum(x == 0) == 0 | sum(is.na(x)) == 1,
                    mean(x, na.rm = TRUE),
-                   # {x[1] <- x[1]*0.8
-                   # x[-1] <- x[-1]*0.2
-                   # mean(x, na.rm = TRUE)}, # 20240924 options to do when continuous new samples coming
                    0)
           })
         
-        if (sum(z.iem.i.ref.merge != 0) < 20){ ## 20240924: changed 5 to 20, maybe delete the whole section
-          z.iem.i.ref.merge <-
-            apply(newset, 2, function(x){ #mean(x)
+        if (sum(z.imd.i.ref.merge != 0) < 20){ 
+          z.imd.i.ref.merge <-
+            apply(newset, 2, function(x){
               ifelse(!is.na(x[1]) && x[1] != 0, 
                      mean(x, na.rm = TRUE),
-                     # {x[1] <- x[1]*0.8
-                     # x[-1] <- x[-1]*0.2
-                     # mean(x, na.rm = TRUE)}, # 20240924 options to do when continuous new samples coming
                      0)
-            })## 20240924: changed x[1] > 0 to x[1] != 0 
+            })
           
         }
         
       } else {
         
-        z.iem.i.ref.merge <- z.iem.i.ref
+        z.imd.i.ref.merge <- z.imd.i.ref
         
       }
       
-      z.out[i, ] <- z.iem.i.ref.merge
+      z.out[i, ] <- z.imd.i.ref.merge
       
     }
     
-    r <- cbind( IEM = iem, z.out)
+    r <- cbind( IMD = imd, z.out)
     
-    colnames(r) <- c("IEM", features)
+    colnames(r) <- c("IMD", features)
     
-    rest <- reference[ !reference$IEM %in% iem, ]
+    rest <- reference[ !reference$IMD %in% imd, ]
     
     ref.new <- rbind(rest, r)
     
